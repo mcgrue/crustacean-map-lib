@@ -1,0 +1,50 @@
+{
+  "name": "crustacean-map-lib",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/mod.js",
+  "types": "./dist/mod.d.ts",
+  "typesVersions": {
+    "*": {
+      "webgl": [
+        "dist/webgl.d.ts"
+      ],
+      "load": [
+        "dist/load.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "import": "./dist/mod.js"
+    },
+    "./load": {
+      "types": "./dist/load.d.ts",
+      "import": "./dist/load.js"
+    },
+    "./webgl": {
+      "types": "./dist/webgl.d.ts",
+      "import": "./dist/webgl.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/core.test.mjs test/farmsville.test.mjs test/package.test.mjs"
+  },
+  "peerDependencies": {
+    "crustacean-sprite-lib": ">=0.1.0"
+  },
+  "devDependencies": {
+    "crustacean-sprite-lib": "file:../crustacean-sprite-lib",
+    "typescript": "~4.6.4"
+  }
+}
