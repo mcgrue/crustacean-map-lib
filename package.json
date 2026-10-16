@@ -37,14 +37,17 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test test/core.test.mjs test/farmsville.test.mjs test/package.test.mjs"
+    "build:dist": "tsc -p tsconfig.json",
+    "test": "npm run build:dist && node --test test/core.test.mjs test/farmsville.test.mjs test/package.test.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
+    "test:package": "node scripts/test-package.mjs",
+    "validate:clean": "node scripts/validate-clean.mjs"
   },
   "peerDependencies": {
     "crustacean-sprite-lib": ">=0.1.0"
   },
   "devDependencies": {
-    "crustacean-sprite-lib": "file:../crustacean-sprite-lib",
+    "crustacean-sprite-lib": "git+https://github.com/mcgrue/crustacean-sprite-lib.git#1b14fe8fa436f70a7cc8673ac6d39f92c3d746fc",
     "typescript": "~4.6.4"
   }
 }

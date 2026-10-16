@@ -1,0 +1,27 @@
+name: Validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify tracked distribution before building
+        run: npm run check:dist
+      - run: npm test
+      - name: Ensure builds leave tracked output unchanged
+        run: git diff --exit-code -- dist
+      - name: Validate installed npm tarball and TypeScript 4.6 consumers
+        run: npm run test:package

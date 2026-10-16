@@ -63,8 +63,31 @@ allows verification. Resize uses CSS viewport size plus optional `pixelRatio`.
 Context loss is handled automatically; `restore()` is also explicit and async.
 `dispose()` cancels pending loading and releases GPU resources/listeners.
 
-Build and portable tests: `npm install`, `npm test`. Set
+Build and portable tests: `npm ci`, `npm test`. Set
 `FARMSVILLE_CONTENT_ROOT` to a Sully content directory to include the full real-map
 dependency and lossless-roundtrip test. The optional `test/webgl.smoke.cjs` runs
 under Breaditor's Electron installation and exercises real WebGL pixels, picking,
 mask union, incremental uploads and context restoration in a hidden window.
+
+Git consumers receive the committed `dist/` ESM JavaScript and declarations;
+installation does not run a compiler. Development pins Sprite to an immutable
+public Git commit; there are no sibling filesystem dependencies or install-time
+build hooks. Install a release using its complete Git commit hash:
+
+```sh
+npm install "git+https://github.com/mcgrue/crustacean-map-lib.git#<release-commit>" "git+https://github.com/mcgrue/crustacean-sprite-lib.git#1b14fe8fa436f70a7cc8673ac6d39f92c3d746fc"
+```
+
+After source changes, run `npm run build:dist` and commit all corresponding
+`dist/` changes. `npm run check:dist` builds into a retained temporary directory
+and checks every output byte, including missing/extra files. LF output is fixed
+in TypeScript configuration for identical results on Windows and Linux.
+
+`npm run test:package` packs the actual npm artifact and installs it in an isolated
+consumer with the pinned Sprite dependency and TypeScript 4.6.4. It checks ESM
+imports without browser globals and root, `/load`, and `/webgl` declarations.
+`npm run validate:clean` copies the repository into a retained temporary checkout,
+runs a locked installation and these checks without sibling repositories or
+optional Farmsville checkout data. Temporary consumer/build artifacts are retained
+for inspection; their paths are printed. CI runs the same checks on Node 22,
+Ubuntu and Windows, and rejects distribution drift before rebuilding.
