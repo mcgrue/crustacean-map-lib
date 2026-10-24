@@ -56,6 +56,15 @@ Animation uses caller-supplied elapsed milliseconds and deterministic random
 sequences. `pick()` uses the last frame's actual draw order and decoded alpha;
 `isObstructed(worldPoint)` unions mask pixels independently of visibility.
 
+An enabled `screenview` also anchors parallax to its world-space `x,y` origin.
+Moving the editor camera then inspects a fixed preview; moving the origin shifts
+layers according to their parallax while parallax-1 layers stay on the base plane.
+`pick()` uses the last render's origin, or an explicit `camera.parallaxOrigin`.
+For editor overlays and CPU tools, pass the same optional `parallaxOrigin` to
+`layerToScreen`, `screenToLayer`, and `pickMap`. `layerCamera` exposes the local
+camera used by the renderer. Omitting the origin preserves ordinary parallax;
+layer offsets retain their existing unscaled world-pixel meaning.
+
 Call `invalidate(layerIndex?)` after editing. The renderer retains integer tile
 textures, compares invalidated data, and uploads only the changed bounding region;
 unchanged frames and unchanged invalidations upload no tile data. Public `stats`

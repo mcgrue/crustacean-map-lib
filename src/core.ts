@@ -57,6 +57,38 @@ export function worldToScreen(p: Point, camera: MapCamera): Point {
     y: (p.y - camera.y) * camera.zoom,
   };
 }
+type LayerTransform = Pick<MapLayer, "offset" | "parallax">;
+
+/** Camera in a layer's local pixels; shared by rendering and inverse picking. */
+export function layerCamera(camera: MapCamera, layer?: LayerTransform): Point {
+  const origin = camera.parallaxOrigin;
+  const px = layer?.parallax?.X ?? 1,
+    py = layer?.parallax?.Y ?? 1;
+  return {
+    x:
+      (origin ? camera.x + (px - 1) * origin.x : camera.x * px) -
+      (layer?.offset?.X || 0),
+    y:
+      (origin ? camera.y + (py - 1) * origin.y : camera.y * py) -
+      (layer?.offset?.Y || 0),
+  };
+}
+export function layerToScreen(
+  p: Point,
+  camera: MapCamera,
+  layer?: LayerTransform,
+): Point {
+  const local = layerCamera(camera, layer);
+  return { x: (p.x - local.x) * camera.zoom, y: (p.y - local.y) * camera.zoom };
+}
+export function screenToLayer(
+  p: Point,
+  camera: MapCamera,
+  layer?: LayerTransform,
+): Point {
+  const local = layerCamera(camera, layer);
+  return { x: p.x / camera.zoom + local.x, y: p.y / camera.zoom + local.y };
+}
 export function entityPosition(asset: MapAsset, e: MapEntity): Point {
   const s = tileSize(asset);
   return {
@@ -84,14 +116,11 @@ export function pickMap(
     l = asset.map.layers[layerIndex],
     s = tileSize(asset, l);
   // Pixel coordinates refer to a layer's transformed surface, including parallax.
-  const lx = camera
-    ? p.x / camera.zoom + camera.x * (l?.parallax?.X ?? 1)
-    : world.x;
-  const ly = camera
-    ? p.y / camera.zoom + camera.y * (l?.parallax?.Y ?? 1)
-    : world.y;
-  const tx = Math.floor((lx - (l?.offset?.X || 0)) / s.width),
-    ty = Math.floor((ly - (l?.offset?.Y || 0)) / s.height);
+  const local = camera
+    ? screenToLayer(p, camera, l)
+    : { x: world.x - (l?.offset?.X || 0), y: world.y - (l?.offset?.Y || 0) };
+  const tx = Math.floor(local.x / s.width),
+    ty = Math.floor(local.y / s.height);
   const valid =
     l && tx >= 0 && ty >= 0 && tx < l.dimensions.X && ty < l.dimensions.Y;
   const result: MapPick = {
@@ -109,16 +138,7 @@ export function pickMap(
     const e = asset.map.entities[i],
       el = asset.map.layers.find((a) => a.name === e.location.layer),
       b = entityBounds(asset, e);
-    const ex = camera
-      ? p.x / camera.zoom +
-        camera.x * (el?.parallax?.X ?? 1) -
-        (el?.offset?.X || 0)
-      : world.x;
-    const ey = camera
-      ? p.y / camera.zoom +
-        camera.y * (el?.parallax?.Y ?? 1) -
-        (el?.offset?.Y || 0)
-      : world.y;
+    const { x: ex, y: ey } = camera ? screenToLayer(p, camera, el) : world;
     if (ex >= b.x && ey >= b.y && ex < b.x + b.width && ey < b.y + b.height) {
       result.entityIndex = i;
       break;
