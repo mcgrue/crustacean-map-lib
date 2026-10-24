@@ -5,6 +5,9 @@ import {
   entityBounds,
   entityPosition,
   pickMap,
+  layerCamera,
+  layerToScreen,
+  screenToLayer,
   tileSize,
 } from "./core.js";
 import type {
@@ -246,6 +249,7 @@ export class WebGLMapRenderer {
   private fallbackImage!: WebGLTexture;
   private fallbackIndex!: WebGLTexture;
   private hitDraws: HitDraw[] = [];
+  private parallaxOrigin?: Point;
   private pixels = new Map<string, ImageData>();
   private lostHandler = (e: Event) => {
     e.preventDefault();
@@ -692,11 +696,8 @@ export class WebGLMapRenderer {
       layer.dimensions.Y,
     );
     this.quad(p, 0, 0, options.width, options.height, options);
-    gl.uniform2f(
-      this.uniform(p, "u_camera"),
-      camera.x * (layer.parallax?.X ?? 1) - (layer.offset?.X || 0),
-      camera.y * (layer.parallax?.Y ?? 1) - (layer.offset?.Y || 0),
-    );
+    const localCamera = layerCamera(camera, layer);
+    gl.uniform2f(this.uniform(p, "u_camera"), localCamera.x, localCamera.y);
     gl.uniform2f(
       this.uniform(p, "u_worldSize"),
       options.width / camera.zoom,
@@ -748,12 +749,7 @@ export class WebGLMapRenderer {
       r = frameRect(s.definition, entry.player.frame),
       p = this.spriteProgram,
       gl = this.gl;
-    const x =
-        (b.x + (layer?.offset?.X || 0) - camera.x * (layer?.parallax?.X ?? 1)) *
-        camera.zoom,
-      y =
-        (b.y + (layer?.offset?.Y || 0) - camera.y * (layer?.parallax?.Y ?? 1)) *
-        camera.zoom;
+    const { x, y } = layerToScreen(b, camera, layer);
     if (
       x + b.width * camera.zoom < 0 ||
       y + b.height * camera.zoom < 0 ||
@@ -784,6 +780,12 @@ export class WebGLMapRenderer {
       return;
     if (!Number.isFinite(camera.zoom) || camera.zoom <= 0)
       throw new Error("Camera zoom must be positive");
+    if (options.screenview?.enabled)
+      camera = {
+        ...camera,
+        parallaxOrigin: { x: options.screenview.x, y: options.screenview.y },
+      };
+    this.parallaxOrigin = camera.parallaxOrigin;
     const gl = this.gl,
       a = this.asset,
       ratio = options.pixelRatio ?? globalThis.devicePixelRatio ?? 1;
@@ -913,16 +915,7 @@ export class WebGLMapRenderer {
       ) =>
         this.solid(
           {
-            x:
-              (r.x +
-                (layer?.offset?.X || 0) -
-                camera.x * (layer?.parallax?.X ?? 1)) *
-              camera.zoom,
-            y:
-              (r.y +
-                (layer?.offset?.Y || 0) -
-                camera.y * (layer?.parallax?.Y ?? 1)) *
-              camera.zoom,
+            ...layerToScreen(r, camera, layer),
             width: r.width * camera.zoom,
             height: r.height * camera.zoom,
           },
@@ -1037,6 +1030,10 @@ export class WebGLMapRenderer {
     options: { smart?: boolean } = {},
   ): MapPick {
     if (!this.asset) throw new Error("No map loaded");
+    camera = {
+      ...camera,
+      parallaxOrigin: camera.parallaxOrigin ?? this.parallaxOrigin,
+    };
     const a = this.asset,
       result = pickMap(a, point, camera, layerIndex);
     delete result.entityIndex;
@@ -1044,16 +1041,7 @@ export class WebGLMapRenderer {
       const hit = this.hitDraws[i],
         layer = hit.layer;
       if ((layer?.alpha ?? 1) <= 0) continue;
-      const world = {
-        x:
-          point.x / camera.zoom +
-          camera.x * (layer?.parallax?.X ?? 1) -
-          (layer?.offset?.X || 0),
-        y:
-          point.y / camera.zoom +
-          camera.y * (layer?.parallax?.Y ?? 1) -
-          (layer?.offset?.Y || 0),
-      };
+      const world = screenToLayer(point, camera, layer);
       if (hit.kind === "entity") {
         const e = hit.entry.entity,
           s = a.sprites[e.filename],

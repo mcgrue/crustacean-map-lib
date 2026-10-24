@@ -57,6 +57,7 @@ export declare class WebGLMapRenderer {
     private fallbackImage;
     private fallbackIndex;
     private hitDraws;
+    private parallaxOrigin?;
     private pixels;
     private lostHandler;
     private restoreHandler;

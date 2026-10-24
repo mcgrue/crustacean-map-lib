@@ -7,6 +7,11 @@ export declare function dimensions(asset: MapAsset): XY;
 export declare function bounds(asset: MapAsset): MapRect;
 export declare function screenToWorld(p: Point, camera: MapCamera): Point;
 export declare function worldToScreen(p: Point, camera: MapCamera): Point;
+declare type LayerTransform = Pick<MapLayer, "offset" | "parallax">;
+/** Camera in a layer's local pixels; shared by rendering and inverse picking. */
+export declare function layerCamera(camera: MapCamera, layer?: LayerTransform): Point;
+export declare function layerToScreen(p: Point, camera: MapCamera, layer?: LayerTransform): Point;
+export declare function screenToLayer(p: Point, camera: MapCamera, layer?: LayerTransform): Point;
 export declare function entityPosition(asset: MapAsset, e: MapEntity): Point;
 export declare function entityBounds(asset: MapAsset, e: MapEntity): MapRect;
 export declare function pickMap(asset: MapAsset, p: Point, camera?: MapCamera, layerIndex?: number): MapPick;
@@ -17,3 +22,4 @@ export declare function serializeMap(asset: MapAsset): {
     data: string;
 };
 export declare function createEmptyMap(): MapAsset;
+export {};

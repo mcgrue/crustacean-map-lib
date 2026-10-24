@@ -10,6 +10,8 @@ export interface Point {
 }
 export interface MapCamera extends Point {
     zoom: number;
+    /** World-space parallax pivot. Omit to use the camera's ordinary parallax. */
+    parallaxOrigin?: Point;
 }
 export interface MapRect extends Point {
     width: number;
