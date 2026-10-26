@@ -107,6 +107,11 @@ export interface MapAsset {
   contentRootUrl: string;
   dependencies: string[];
   diagnostics: MapDiagnostic[];
+  /** Validated display defaults from adjacent $$$_MAPED.json; never serialized. */
+  editorView?: {
+    checkerColorA?: [number, number, number, number];
+    checkerColorB?: [number, number, number, number];
+  };
 }
 export interface LoadMapOptions {
   contentRootUrl?: string;

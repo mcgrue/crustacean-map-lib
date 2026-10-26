@@ -12,6 +12,11 @@ function record(value: any, label: string): void {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error(`${label}: expected object`);
 }
+function checkerColor(value: unknown): [number, number, number, number] | undefined {
+  return Array.isArray(value) && value.length === 4 &&
+    value.every(channel => typeof channel === "number" && Number.isFinite(channel) && channel >= 0 && channel <= 1)
+    ? [...value] as [number, number, number, number] : undefined;
+}
 function positive(value: any, label: string): void {
   if (!Number.isSafeInteger(value) || value <= 0)
     throw new Error(`${label}: expected positive integer`);
@@ -162,10 +167,15 @@ export async function loadMap(
   }
   const [map, data] = await Promise.all([json(mapUrl), json(dataUrl)]);
   validateMap(map, data);
-  const config =
-    options.contentRootUrl || map.MAPED_CONTENT_ROOT
-      ? undefined
-      : await json(new URL("$$$_MAPED.json", mapDir).href, true);
+  const configUrl = new URL("$$$_MAPED.json", mapDir).href;
+  let config: any, configError: unknown;
+  try { config = await json(configUrl, true); }
+  catch (error) {
+    // An explicit asset root makes this file display-only. Keep existing
+    // failures when the config is needed to resolve required assets.
+    if (options.signal?.aborted || !(options.contentRootUrl || map.MAPED_CONTENT_ROOT)) throw error;
+    configError = error;
+  }
   const root = new URL(
     resolveAssetUrl(
       options.contentRootUrl ||
@@ -188,6 +198,12 @@ export async function loadMap(
     dependencies: [],
     diagnostics: [],
   };
+  const colorA = checkerColor(config?.checkerColorA), colorB = checkerColor(config?.checkerColorB);
+  if (colorA || colorB) asset.editorView = {
+    ...(colorA ? {checkerColorA: colorA} : {}), ...(colorB ? {checkerColorB: colorB} : {}),
+  };
+  if (configError) asset.diagnostics.push({severity: "warning", url: configUrl,
+    message: `Ignoring optional display config: ${configError instanceof Error ? configError.message : String(configError)}`});
   const warning = (url: string, e: unknown) =>
     asset.diagnostics.push({
       severity: "error",
