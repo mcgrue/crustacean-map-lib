@@ -19,13 +19,45 @@ uniform usampler2D u_tiles;uniform usampler2D u_animation;
 uniform vec2 u_camera;uniform vec2 u_worldSize;uniform vec2 u_tileSize;
 uniform ivec2 u_dimensions;uniform int u_perRow;uniform int u_animWidth;
 uniform float u_opacity;uniform int u_mode;
+uniform bool u_zoneIds;uniform bool u_zonePatterns;uniform float u_zoom;
+// Small bitmap digits keep IDs crisp without a font/atlas dependency.
+const uint digits[10]=uint[10](31599u,29850u,29671u,31207u,18925u,31183u,31695u,18727u,31727u,31215u);
+vec3 zoneColor(uint id,vec2 local){
+  float h=float(id)*2.399963;
+  vec3 fill=vec3(.45+.45*sin(h),.5+.4*sin(h+2.),.55+.4*sin(h+4.));
+  if(u_zonePatterns){
+    vec2 pixel=floor(local);
+    float spacing=4.+float((id/4u)%3u);
+    uint kind=id%4u;
+    float stripe=kind==0u?pixel.x+pixel.y:kind==1u?pixel.x-pixel.y:kind==2u?pixel.y:pixel.x;
+    if(mod(stripe,spacing)<1.)fill=mix(fill,vec3(.04),.55);
+  }
+  if(!u_zoneIds)return fill;
+  int count=1;uint value=id;
+  for(int i=0;i<9;i++){value/=10u;if(value==0u)break;count++;}
+  vec2 size=vec2(float(count*4-1),5.);
+  vec2 cell=u_tileSize*u_zoom;
+  float scale=floor(min(3.,min(cell.x/(size.x+4.),cell.y/9.)));
+  if(scale<1.)return fill;
+  // Snap before dividing so floating-point pan offsets cannot flicker glyph edges.
+  vec2 p=floor((floor(local)-floor((cell-size*scale)*.5))/scale);
+  if(any(lessThan(p,vec2(-1.)))||any(greaterThanEqual(p,size+1.)))return fill;
+  // A dark plate provides contrast over both light and dark artwork.
+  if(p.y<0.||p.y>=5.||p.x<0.||p.x>=size.x)return vec3(.02);
+  int index=int(p.x)/4;int column=int(p.x)%4;
+  uint divisor=1u;
+  for(int i=0;i<9;i++){if(i>=count-index-1)break;divisor*=10u;}
+  uint digit=(id/divisor)%10u;
+  bool ink=column<3&&(digits[int(digit)]&(1u<<uint(int(p.y)*3+column)))!=0u;
+  return ink?vec3(1.):vec3(.02);
+}
 void main(){
   vec2 world=u_camera+v_uv*u_worldSize;
   ivec2 tile=ivec2(floor(world/u_tileSize));
   if(any(lessThan(tile,ivec2(0)))||any(greaterThanEqual(tile,u_dimensions)))discard;
   uint id=texelFetch(u_tiles,tile,0).r;
   if(id==0u)discard;
-  if(u_mode==2){float h=float(id)*2.399963; color=vec4(.45+.45*sin(h),.5+.4*sin(h+2.),.55+.4*sin(h+4.),u_opacity);return;}
+  if(u_mode==2){color=vec4(zoneColor(id,mod(world,u_tileSize)*u_zoom),u_opacity);return;}
   uint mapped=texelFetch(u_animation,ivec2(int(id)%u_animWidth,int(id)/u_animWidth),0).r;
   vec2 atlas=(vec2(int(mapped)%u_perRow,int(mapped)/u_perRow)*u_tileSize+mod(world,u_tileSize)+vec2(.0001))/vec2(textureSize(u_image,0));
   vec4 sampleColor=texture(u_image,atlas);
@@ -457,7 +489,7 @@ export class WebGLMapRenderer {
                 data,
                 index: Number(key.slice(4)),
             });
-        const gl = this.gl, p = this.tileProgram, s = atlas?.asset.definition.tilesize || tileSize(this.asset);
+        const gl = this.gl, p = this.tileProgram, s = mode === 2 ? tileSize(this.asset) : atlas?.asset.definition.tilesize || tileSize(this.asset);
         const t = this.tileTexture(key, data, layer.dimensions.X, layer.dimensions.Y);
         this.quad(p, 0, 0, options.width, options.height, options);
         const localCamera = layerCamera(camera, layer);
@@ -469,6 +501,9 @@ export class WebGLMapRenderer {
         gl.uniform1i(this.uniform(p, "u_animWidth"), atlas?.size || 1);
         gl.uniform1f(this.uniform(p, "u_opacity"), layer.alpha ?? 1);
         gl.uniform1i(this.uniform(p, "u_mode"), mode);
+        gl.uniform1i(this.uniform(p, "u_zoneIds"), options.showZoneIds ? 1 : 0);
+        gl.uniform1i(this.uniform(p, "u_zonePatterns"), options.zonePatterns ? 1 : 0);
+        gl.uniform1f(this.uniform(p, "u_zoom"), camera.zoom);
         // Always bind valid float and integer textures, including procedural zone mode.
         const anyAtlas = atlas || this.atlases.values().next().value;
         gl.activeTexture(gl.TEXTURE0);
@@ -789,6 +824,10 @@ export class WebGLMapRenderer {
             }, a.data.legacy_obstruction_data, camera, options, 1);
     }
     drawZones(camera, options) {
+        const opacity = Number.isFinite(options.zoneOpacity)
+            ? Math.max(0, Math.min(1, options.zoneOpacity)) : 0.35;
+        if (opacity === 0)
+            return;
         const a = this.asset, d = a.map.zone_layer_size || dimensions(a);
         if (this.dirty.has("zones") || this.zoneValues.length !== d.X * d.Y) {
             this.zoneValues = new Array(d.X * d.Y).fill(0);
@@ -796,7 +835,7 @@ export class WebGLMapRenderer {
                 if (z.x >= 0 && z.y >= 0 && z.x < d.X && z.y < d.Y)
                     this.zoneValues[z.y * d.X + z.x] = z.z;
         }
-        this.drawLayer("zones", { name: "Zones", dimensions: d, alpha: 0.35 }, this.zoneValues, camera, options, 2);
+        this.drawLayer("zones", { name: "Zones", dimensions: d, alpha: opacity }, this.zoneValues, camera, options, 2);
     }
     async restore() {
         if (this.disposed)

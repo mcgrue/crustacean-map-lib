@@ -6,6 +6,11 @@ export interface MapRenderOptions {
     pixelRatio?: number;
     showObstructions?: boolean;
     showZones?: boolean;
+    /** Zone fill opacity, clamped to 0..1; defaults to 0.35. */
+    zoneOpacity?: number;
+    /** Opt-in non-color identification; zero remains empty. */
+    showZoneIds?: boolean;
+    zonePatterns?: boolean;
     showEntities?: boolean;
     showBounds?: boolean;
     showHitboxes?: boolean;
