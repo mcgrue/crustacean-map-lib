@@ -128,7 +128,8 @@ vec3 zoneColor(uint id,vec2 local){
   vec2 cell=u_tileSize*u_zoom;
   float scale=floor(min(3.,min(cell.x/(size.x+4.),cell.y/9.)));
   if(scale<1.)return fill;
-  vec2 p=floor((local-(cell-size*scale)*.5)/scale);
+  // Snap before dividing so floating-point pan offsets cannot flicker glyph edges.
+  vec2 p=floor((floor(local)-floor((cell-size*scale)*.5))/scale);
   if(any(lessThan(p,vec2(-1.)))||any(greaterThanEqual(p,size+1.)))return fill;
   // A dark plate provides contrast over both light and dark artwork.
   if(p.y<0.||p.y>=5.||p.x<0.||p.x>=size.x)return vec3(.02);
