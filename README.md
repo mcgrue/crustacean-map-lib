@@ -34,6 +34,12 @@ font or atlas, and retain the original zone indexes. Zero is empty; opacity zero
 skips the overlay. Numeric labels are hidden when cells are too small to read.
 These rendering options do not modify or serialize into map data.
 
+`loadMap` exposes valid normalized RGBA `checkerColorA` / `checkerColorB` from
+adjacent `$$$_MAPED.json` as `asset.editorView`. It reads these display defaults
+even with an explicit content root, without changing asset-root precedence.
+Invalid color fields are omitted independently. Callers can pass these colors
+to the renderer's `checker` options; source map/config data stays unchanged.
+
 `MapAsset` retains mutable source `map` and `data`, loaded tilesets/sprites, all
 dependency URLs and diagnostics. Content-root precedence is an explicit option,
 `MAPED_CONTENT_ROOT` relative to the map, then adjacent `$$$_MAPED.json`'s

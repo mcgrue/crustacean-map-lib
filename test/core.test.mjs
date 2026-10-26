@@ -132,7 +132,7 @@ test("explicit content root takes priority, map-relative root takes priority ove
     fetch: fetcher(files),
   });
   assert.equal(a.contentRootUrl, "https://fixture.test/game/");
-  assert.ok(!a.dependencies.some((p) => p.includes("MAPED.json")));
+  assert.ok(a.dependencies.some((p) => p.includes("MAPED.json")));
   files.set("https://fixture.test/explicit/chrs/npc.json", sprite());
   a = await loadMap("https://fixture.test/game/maps/demo.map.json", {
     contentRootUrl: "https://fixture.test/explicit",
