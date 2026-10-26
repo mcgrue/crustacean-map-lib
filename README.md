@@ -28,6 +28,12 @@ const writes = serializeMap(asset); // { map: JSON text, data: JSON text }
 renderer.dispose();
 ```
 
+Zone overlays support `zoneOpacity` (0..1, default 0.35), `showZoneIds`, and
+`zonePatterns` alongside `showZones`. IDs and patterns are opt-in, use no external
+font or atlas, and retain the original zone indexes. Zero is empty; opacity zero
+skips the overlay. Numeric labels are hidden when cells are too small to read.
+These rendering options do not modify or serialize into map data.
+
 `MapAsset` retains mutable source `map` and `data`, loaded tilesets/sprites, all
 dependency URLs and diagnostics. Content-root precedence is an explicit option,
 `MAPED_CONTENT_ROOT` relative to the map, then adjacent `$$$_MAPED.json`'s
