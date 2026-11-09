@@ -1,3 +1,4 @@
+import { sampleObstruction } from "./collision.js";
 import { SpritePlayer, frameRect, validateAtlas } from "crustacean-sprite-lib";
 import {
   animatedTile,
@@ -21,7 +22,19 @@ import type {
   TilesetAsset,
 } from "./types.js";
 
+/** Authoritative runtime state; omitted entities are hidden. Coordinates are hitbox origins. */
+export interface RuntimeEntityPose {
+  readonly entityIndex: number;
+  readonly x: number;
+  readonly y: number;
+  readonly frame: number;
+  readonly visible?: boolean;
+}
 export interface MapRenderOptions {
+  /** Supplying this disables renderer-owned entity animation advancement. */
+  entityPoses?: readonly RuntimeEntityPose[];
+  /** Default true for editor compatibility. Runtime hosts should set false. */
+  respectEditorVisibility?: boolean;
   width: number;
   height: number;
   timeMs: number;
@@ -81,6 +94,8 @@ interface AtlasTexture {
   asset: TilesetAsset;
 }
 interface PlayerEntry {
+  frame?: number;
+  sourceIndex?: number;
   player: SpritePlayer;
   entity: MapEntity;
   seed: number;
@@ -786,7 +801,7 @@ export class WebGLMapRenderer {
       image = s && this.images.get(s.imageUrl);
     if (!s || !image) return;
     const b = entityBounds(a, e),
-      r = frameRect(s.definition, entry.player.frame),
+      r = frameRect(s.definition, entry.frame ?? entry.player.frame),
       p = this.spriteProgram,
       gl = this.gl;
     const { x, y } = layerToScreen(b, camera, layer);
@@ -858,7 +873,7 @@ export class WebGLMapRenderer {
     )
       this.resetPlayers();
     const delta = time - this.time;
-    for (const entry of this.players) {
+    for (const entry of options.entityPoses ? [] : this.players) {
       const d = a.sprites[entry.entity.filename]?.definition;
       if (!d) continue;
       entry.player.select(
@@ -871,6 +886,16 @@ export class WebGLMapRenderer {
     }
     this.time = time;
     this.updateAnimations(time);
+    const respectEditorVisibility = options.respectEditorVisibility !== false;
+    const poses = options.entityPoses && new Map(options.entityPoses.map(p => [p.entityIndex, p]));
+    const renderPlayers: PlayerEntry[] = poses ? this.players.flatMap(entry => {
+      const sourceIndex = a.map.entities.indexOf(entry.entity), pose = poses.get(sourceIndex);
+      if (!pose || pose.visible === false) return [];
+      if (!Number.isFinite(pose.x) || !Number.isFinite(pose.y)) throw new Error('Invalid entity pose coordinates');
+      frameRect(a.sprites[entry.entity.filename].definition, pose.frame);
+      return [{...entry, frame: pose.frame, sourceIndex,
+        entity: {...entry.entity, location: {...entry.entity.location, px: pose.x, py: pose.y}}}];
+    }) : this.players;
     const hidden = (index: number) =>
       options.hiddenLayers instanceof Set
         ? options.hiddenLayers.has(index)
@@ -878,9 +903,9 @@ export class WebGLMapRenderer {
             index,
           );
     const visibleEntities =
-      options.showEntities ?? a.map.MAPED_ENTLAYER_VISIBLE ?? true;
+      options.showEntities ?? (respectEditorVisibility ? a.map.MAPED_ENTLAYER_VISIBLE : undefined) ?? true;
     const tall: PlayerEntry[] = [];
-    const sorted = [...this.players].sort((aEntry, bEntry) => {
+    const sorted = [...renderPlayers].sort((aEntry, bEntry) => {
       const ap = entityPosition(a, aEntry.entity),
         bp = entityPosition(a, bEntry.entity);
       return (
@@ -891,7 +916,7 @@ export class WebGLMapRenderer {
       );
     });
     const drawEntities = (name: string, layer?: MapLayer) => {
-      if (!visibleEntities || layer?.maped_HIDE_ENTS) return;
+      if (!visibleEntities || (respectEditorVisibility && layer?.maped_HIDE_ENTS)) return;
       for (const entry of sorted) {
         if ((entry.entity.location.layer || "Entity Layer (E)") !== name)
           continue;
@@ -922,7 +947,7 @@ export class WebGLMapRenderer {
       const index = Number(token) - 1,
         l = a.map.layers[index];
       if (!l || !/^\d+$/.test(token)) continue;
-      if (!l.MAPED_HIDDEN && !hidden(index)) {
+      if ((!respectEditorVisibility || !l.MAPED_HIDDEN) && !hidden(index)) {
         this.drawLayer(
           `art:${index}`,
           l,
@@ -963,7 +988,7 @@ export class WebGLMapRenderer {
           options,
           1,
         );
-      for (const entry of this.players) {
+      for (const entry of renderPlayers) {
         const e = entry.entity,
           s = a.sprites[e.filename],
           layer = a.map.layers.find((l) => l.name === e.location.layer),
@@ -1098,9 +1123,9 @@ export class WebGLMapRenderer {
             y < clip[1] + clip[3];
         if ((hit.clipMode === 1 && inside) || (hit.clipMode === 2 && !inside))
           continue;
-        const frame = frameRect(s.definition, hit.entry.player.frame);
+        const frame = frameRect(s.definition, hit.entry.frame ?? hit.entry.player.frame);
         if (!this.opaque(s.imageUrl, frame.x + x, frame.y + y)) continue;
-        result.entityIndex = a.map.entities.indexOf(e);
+        result.entityIndex = hit.entry.sourceIndex ?? a.map.entities.indexOf(e);
         return result;
       }
       if (!options.smart && hit.index !== layerIndex) continue;
@@ -1133,55 +1158,8 @@ export class WebGLMapRenderer {
   }
   /** Collision masks combine by union, independently of overlay visibility. */
   isObstructed(point: Point): boolean {
-    if (!this.asset) return false;
-    const a = this.asset,
-      d = dimensions(a);
-    const layers =
-      a.map.format_version === 2 && a.map.obstruction_layers
-        ? a.map.obstruction_layers
-        : [
-            {
-              name: "Obstructions",
-              id: "legacy",
-              dimensions: d,
-              vsp: "obstructions",
-              ...a.map.obstructions_layer,
-            },
-          ];
-    for (const layer of layers) {
-      const tileset = a.tilesets[layer.vsp || "obstructions"];
-      if (!tileset) continue;
-      const s = tileset.definition.tilesize,
-        x = point.x - (layer.offset?.X || 0),
-        y = point.y - (layer.offset?.Y || 0),
-        tx = Math.floor(x / s.width),
-        ty = Math.floor(y / s.height);
-      if (
-        tx < 0 ||
-        ty < 0 ||
-        tx >= layer.dimensions.X ||
-        ty >= layer.dimensions.Y
-      )
-        continue;
-      const data =
-          a.map.format_version === 2 && a.map.obstruction_layers
-            ? a.data.obstruction_data?.[layer.id]
-            : a.data.legacy_obstruction_data,
-        tile = data?.[ty * layer.dimensions.X + tx] || 0;
-      if (!tile) continue;
-      const id = animatedTile(tileset.definition, tile, this.time),
-        perRow = tileset.definition.tiles_per_row;
-      if (
-        this.opaque(
-          tileset.imageUrl,
-          (id % perRow) * s.width + (x % s.width),
-          Math.floor(id / perRow) * s.height + (y % s.height),
-          true,
-        )
-      )
-        return true;
-    }
-    return false;
+    return !!this.asset && sampleObstruction(this.asset, point, this.time,
+      (url, x, y) => this.opaque(url, x, y, true));
   }
   private drawObstructions(camera: MapCamera, options: MapRenderOptions): void {
     const a = this.asset!,

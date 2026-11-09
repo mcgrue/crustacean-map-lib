@@ -1,5 +1,17 @@
 import type { MapAsset, MapCamera, MapPick, Point } from "./types.js";
+/** Authoritative runtime state; omitted entities are hidden. Coordinates are hitbox origins. */
+export interface RuntimeEntityPose {
+    readonly entityIndex: number;
+    readonly x: number;
+    readonly y: number;
+    readonly frame: number;
+    readonly visible?: boolean;
+}
 export interface MapRenderOptions {
+    /** Supplying this disables renderer-owned entity animation advancement. */
+    entityPoses?: readonly RuntimeEntityPose[];
+    /** Default true for editor compatibility. Runtime hosts should set false. */
+    respectEditorVisibility?: boolean;
     width: number;
     height: number;
     timeMs: number;

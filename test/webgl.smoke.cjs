@@ -211,6 +211,19 @@ app
           });
         const blackOpen = renderer.isObstructed({ x: 1, y: 1 }),
           greenBlocked = renderer.isObstructed({ x: 10, y: 10 });
+        const sourceEntity = JSON.stringify(a.map.entities[0]);
+        a.map.layers[0].MAPED_HIDDEN = true;
+        a.map.MAPED_ENTLAYER_VISIBLE = false;
+        renderer.render(camera, {...opts, respectEditorVisibility: false,
+          entityPoses: [{entityIndex: 0, x: 16, y: 0, frame: 0}]});
+        const runtimePixel = sample(104,20), runtimeGround = sample(40,20);
+        const runtimePick = renderer.pick({x:104,y:20},camera,0,{smart:true});
+        if (JSON.stringify(a.map.entities[0]) !== sourceEntity) throw new Error('Runtime render mutated source');
+        renderer.render(camera, {...opts, entityPoses: []});
+        const runtimeHidden = sample(104,20);
+        delete a.map.layers[0].MAPED_HIDDEN;
+        delete a.map.MAPED_ENTLAYER_VISIBLE;
+        renderer.render(camera, opts);
         const uploads = renderer.stats.tileUploads;
         renderer.render(camera, { ...opts, timeMs: 10 });
         const unchangedUploads = renderer.stats.tileUploads,
@@ -308,6 +321,7 @@ app
         renderer.dispose();
         renderer.dispose();
         return {
+          runtimePixel, runtimeGround, runtimePick, runtimeHidden,
           green,
           blue,
           black,
@@ -333,6 +347,10 @@ app
         };
       }.toString()})()`,
     );
+    assert.deepEqual(result.runtimePixel,[0,0,255,255]);
+    assert.deepEqual(result.runtimeGround,[0,255,0,255]);
+    assert.equal(result.runtimePick.entityIndex,0);
+    assert.notDeepEqual(result.runtimeHidden,[0,0,255,255]);
     assert.deepEqual(result.green, [0, 0, 255, 255]); // NPC covers the green tile.
     assert.deepEqual(result.blue, [0, 0, 255, 255]);
     assert.deepEqual(result.black, [0, 0, 0, 255]);

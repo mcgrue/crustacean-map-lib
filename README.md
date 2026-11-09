@@ -112,3 +112,9 @@ runs a locked installation and these checks without sibling repositories or
 optional Farmsville checkout data. Temporary consumer/build artifacts are retained
 for inspection; their paths are printed. CI runs the same checks on Node 22,
 Ubuntu and Windows, and rejects distribution drift before rebuilding.
+
+## Runtime rendering and collision
+
+`MapRenderOptions.entityPoses` supplies an immutable array of `{entityIndex,x,y,frame,visible?}`. Coordinates are hitbox origins. Only supplied visible entities draw; the renderer does not advance their animation. Source map entities are never mutated. Set `respectEditorVisibility: false` to ignore editor-only visibility flags. Omitting these options preserves editor behavior.
+
+`sampleObstruction(asset, point, timeMs, sampler)` performs camera-independent pixel collision over legacy or v2 obstruction layers. `obstructionPixel(mask,x,y)` reads decoded RGBA data; alpha-zero, black, and magenta are empty. `validateCollisionMasks(asset,masks)` rejects missing/corrupt collision assets before a runtime starts. Image decoding belongs to the host.
