@@ -52,6 +52,8 @@ export function validateCollisionMasks(asset, masks) {
         if (!tileset || !mask || !Number.isInteger(mask.width) || !Number.isInteger(mask.height) || mask.width <= 0 || mask.height <= 0 || mask.data.length !== mask.width * mask.height * 4)
             throw new Error(`Missing or invalid collision image: ${layer.id}`);
         const d = tileset.definition, s = d.tilesize;
+        if (![s.width, s.height, d.tiles_per_row].every(v => Number.isSafeInteger(v) && v > 0))
+            throw new Error(`Invalid collision tile dimensions: ${layer.id}`);
         const valid = (id) => (id % d.tiles_per_row + 1) * s.width <= mask.width && (Math.floor(id / d.tiles_per_row) + 1) * s.height <= mask.height;
         if (data.some(id => !valid(id)) || d.animations?.some(a => !valid(a.start) || !valid(a.end)))
             throw new Error(`Collision tile outside atlas: ${layer.id}`);
